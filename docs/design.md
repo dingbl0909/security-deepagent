@@ -143,14 +143,35 @@ security-deepagent-practice/
 
 ### 4.5 Skills
 
-Skills 使用 Markdown 文件表达能力边界和使用说明，对齐 `rag_learning/deepagent/src/skills` 的风格。
+Skills 使用 Markdown 文件表达能力边界和使用说明，对齐 `rag_learning/deepagent/src/skills` 的风格。运行时由 `skills.py` 扫描 `skills/*/SKILL.md`，解析可选 YAML frontmatter，并把启用的 Skill 指令追加到主 Agent 的 system prompt 中。
+
+每个 Skill 目录至少包含：
+
+```text
+skills/<skill-name>/
+└── SKILL.md
+```
+
+`SKILL.md` 推荐包含：
+
+- `name`：Skill 名称。
+- `description`：能力说明和适用场景。
+- `triggers`：用于按用户问题匹配 Skill 的触发词。
+- Markdown 正文：能力边界、可用工具、使用步骤、安全要求和输出格式。
+
+配置项：
+
+- `SECURITY_AGENT_SKILLS_ENABLED=true`
+- `SECURITY_AGENT_SKILLS_DIR=skills`
 
 首版包含：
 
 - `skills/research/SKILL.md`
-  - 用于安防资料调研、方案整理、排障报告生成。
+  - 用于安防资料调研、方案整理、排障报告生成，主要指导模型使用 `search_security_knowledge` 保留证据来源。
 - `skills/system-info/SKILL.md`
-  - 用于采集环境信息、辅助部署排障。
+  - 用于采集环境信息、辅助部署排障；首版不开放直接读取项目外文件或执行 shell。
+
+Skills 不直接生成新工具，也不绕过工具白名单。模型仍只能调用 `tools.py` 注册的工具，高风险动作仍需要人工确认。
 
 后续可以增加：
 
@@ -178,17 +199,20 @@ Skills 使用 Markdown 文件表达能力边界和使用说明，对齐 `rag_lea
 
 ### 4.7 沙箱 Backend
 
-`backend.py` 封装 DeepAgents Backend 创建逻辑。
+`backend.py` 封装 DeepAgents Backend 创建逻辑，并通过 `SECURITY_AGENT_SANDBOX_PROVIDER` 选择沙箱 provider。
 
-首版优先使用：
+默认 provider：
 
-- `FilesystemBackend(root_dir=..., virtual_mode=True)`
+- `local`
+  - 使用 `FilesystemBackend(root_dir=..., virtual_mode=True)`。
+  - 可选开启 `LocalShellBackend`，仅允许在项目工作目录内执行命令。
 
-可选支持：
+预留 provider：
 
-- `LocalShellBackend`
-  - 仅允许在项目工作目录内执行命令。
-  - 设置超时时间和输出大小限制。
+- `opensandbox`
+  - 预留 OpenSandbox 接入点。
+  - 需要配置 `SECURITY_AGENT_OPENSANDBOX_DOMAIN`。
+  - 当前轻量本地版本不默认安装 OpenSandbox SDK，也不默认启用远端沙箱。
 
 设计原则：
 

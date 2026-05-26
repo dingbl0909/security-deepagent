@@ -22,11 +22,15 @@ class ChatResponse(BaseModel):
     answer: str
     thread_id: str
     user_id: str
+    react_trace: list[str] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
     tasks: list[dict[str, Any]] = Field(default_factory=list)
     needs_review: bool = False
     review_id: int | None = None
     risk_level: str = "low"
+    review_reason: str | None = None
+    proposed_action: str | None = None
+    risk_keywords: list[str] = Field(default_factory=list)
 
 
 class ContinueReviewRequest(BaseModel):

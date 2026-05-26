@@ -54,9 +54,16 @@ class Settings:
     log_dir: Path
     memory_dir: Path
     workspace_dir: Path
+    skills_dir: Path
     subagents_path: Path
     settings_path: Path
     top_k: int
+    skills_enabled: bool
+    sandbox_provider: str
+    sandbox_allow_shell: bool
+    opensandbox_domain: str | None
+    opensandbox_image: str | None
+    opensandbox_id: str | None
 
     def ensure_directories(self) -> None:
         for path in [
@@ -84,9 +91,16 @@ def get_settings() -> Settings:
         log_dir=_path_env("SECURITY_AGENT_LOG_DIR", "data/logs"),
         memory_dir=_path_env("SECURITY_AGENT_MEMORY_DIR", "data/memory"),
         workspace_dir=_path_env("SECURITY_AGENT_WORKSPACE_DIR", "data/workspace"),
+        skills_dir=_path_env("SECURITY_AGENT_SKILLS_DIR", "skills"),
         subagents_path=_path_env("SECURITY_AGENT_SUBAGENTS_PATH", "config/subagents.yaml"),
         settings_path=_path_env("SECURITY_AGENT_SETTINGS_PATH", "config/settings.yaml"),
         top_k=_int_env("SECURITY_AGENT_TOP_K", 4),
+        skills_enabled=_bool_env("SECURITY_AGENT_SKILLS_ENABLED", True),
+        sandbox_provider=os.getenv("SECURITY_AGENT_SANDBOX_PROVIDER", "local").strip().lower(),
+        sandbox_allow_shell=_bool_env("SECURITY_AGENT_ALLOW_SHELL", False),
+        opensandbox_domain=os.getenv("SECURITY_AGENT_OPENSANDBOX_DOMAIN") or None,
+        opensandbox_image=os.getenv("SECURITY_AGENT_OPENSANDBOX_IMAGE") or None,
+        opensandbox_id=os.getenv("SECURITY_AGENT_OPENSANDBOX_ID") or None,
     )
     settings.ensure_directories()
     return settings

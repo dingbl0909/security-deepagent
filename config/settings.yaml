@@ -18,8 +18,13 @@ storage:
   workspace_dir: data/workspace
 
 sandbox:
+  provider: local
   backend: filesystem
   allow_shell: false
   shell_timeout_seconds: 30
   max_output_bytes: 50000
+  opensandbox:
+    domain:
+    image:
+    sandbox_id:
 

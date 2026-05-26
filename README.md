@@ -25,6 +25,44 @@ uvicorn security_agent.app:app --host 0.0.0.0 --port 8015
 
 如果没有可用的大模型服务，可以在 `.env` 中保持 `SECURITY_AGENT_LLM_ENABLED=false`，系统会使用本地规则链路完成测试。
 
+## 前端工作台
+
+项目包含一个 React + TypeScript + Vite 前端，用于产品化展示安防助手能力：
+
+```bash
+cd /home/blding/security-deepagent-practice/frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+
+默认前端地址为 `http://127.0.0.1:5173`，后端地址通过 `VITE_API_BASE_URL` 配置，默认指向 `http://127.0.0.1:8015`。
+
+前端包含：
+
+- 智能工作台：聊天、答案、证据、ReAct 轨迹、任务和风险展示。
+- 业务概览：设备和告警概览。
+- 历史会话：读取 `/threads` 和 `/threads/{thread_id}`。
+- 人工确认：读取 `/reviews` 并调用 `/review/continue`。
+
+## 沙箱配置
+
+项目默认使用本地轻量沙箱：
+
+```bash
+SECURITY_AGENT_SANDBOX_PROVIDER=local
+SECURITY_AGENT_ALLOW_SHELL=false
+```
+
+`local` provider 会把 Agent 可写目录限制在 `data/workspace/`。如需预留 OpenSandbox 部署，可以切换：
+
+```bash
+SECURITY_AGENT_SANDBOX_PROVIDER=opensandbox
+SECURITY_AGENT_OPENSANDBOX_DOMAIN=http://your-opensandbox-host:8080
+```
+
+当前轻量版本只提供 OpenSandbox 接入点，真实接入时需要补充 OpenSandbox SDK、连接配置和 backend adapter。
+
 ## API 示例
 
 ```bash

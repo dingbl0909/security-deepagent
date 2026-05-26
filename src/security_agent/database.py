@@ -214,6 +214,69 @@ class Database:
             "reviews": [dict(row) for row in reviews],
         }
 
+    def list_threads(self, limit: int = 50) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    t.thread_id,
+                    t.user_id,
+                    t.title,
+                    t.summary,
+                    t.created_at,
+                    t.updated_at,
+                    COUNT(DISTINCT m.id) AS message_count,
+                    COUNT(DISTINCT CASE WHEN r.status = 'pending' THEN r.id END) AS pending_review_count
+                FROM threads t
+                LEFT JOIN messages m ON m.thread_id = t.thread_id
+                LEFT JOIN review_requests r ON r.thread_id = t.thread_id
+                GROUP BY t.thread_id
+                ORDER BY t.updated_at DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_reviews(self, status: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        with self.connect() as conn:
+            if status:
+                rows = conn.execute(
+                    """
+                    SELECT id, thread_id, risk_level, reason, proposed_action, status, created_at, updated_at
+                    FROM review_requests
+                    WHERE status = ?
+                    ORDER BY updated_at DESC
+                    LIMIT ?
+                    """,
+                    (status, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT id, thread_id, risk_level, reason, proposed_action, status, created_at, updated_at
+                    FROM review_requests
+                    ORDER BY updated_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_devices(self, query: str = "") -> list[dict[str, Any]]:
+        if query.strip():
+            return self.search_devices(query)
+        with self.connect() as conn:
+            rows = conn.execute("SELECT * FROM devices ORDER BY name").fetchall()
+        return [self._decode_json(row) for row in rows]
+
+    def list_alarms(self, query: str = "") -> list[dict[str, Any]]:
+        if query.strip():
+            return self.search_alarms(query)
+        with self.connect() as conn:
+            rows = conn.execute("SELECT * FROM alarms ORDER BY occurred_at DESC").fetchall()
+        return [self._decode_json(row) for row in rows]
+
     def search_devices(self, query: str) -> list[dict[str, Any]]:
         terms = self._query_terms(query)
         with self.connect() as conn:
