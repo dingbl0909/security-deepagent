@@ -149,6 +149,11 @@ button {
   color: #7dd3fc;
 }
 
+.status-dot--vision {
+  background: rgba(167, 139, 250, 0.18);
+  color: #ddd6fe;
+}
+
 .status-dot--unknown {
   background: rgba(148, 163, 184, 0.16);
   color: #cbd5e1;
@@ -172,6 +177,69 @@ button {
 .chat-form {
   display: grid;
   gap: 12px;
+}
+
+.image-upload {
+  display: grid;
+  gap: 12px;
+  border: 1px dashed rgba(167, 139, 250, 0.35);
+  border-radius: 18px;
+  background: rgba(30, 27, 75, 0.28);
+  padding: 14px;
+}
+
+.image-upload-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.image-upload-tip {
+  margin: 6px 0 0;
+}
+
+.image-upload-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.image-upload-input {
+  display: none;
+}
+
+.image-upload-empty,
+.image-preview {
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.38);
+}
+
+.image-upload-empty {
+  padding: 16px;
+  color: #94a3b8;
+}
+
+.image-preview {
+  overflow: hidden;
+}
+
+.image-preview img {
+  display: block;
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  background: rgba(2, 6, 23, 0.65);
+}
+
+.image-preview-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  color: #94a3b8;
+  font-size: 13px;
 }
 
 .chat-form textarea {

@@ -59,6 +59,10 @@ class Settings:
     settings_path: Path
     top_k: int
     skills_enabled: bool
+    vision_enabled: bool
+    vision_model: str
+    vision_api_key: str | None
+    vision_base_url: str | None
     sandbox_provider: str
     sandbox_allow_shell: bool
     opensandbox_domain: str | None
@@ -96,6 +100,10 @@ def get_settings() -> Settings:
         settings_path=_path_env("SECURITY_AGENT_SETTINGS_PATH", "config/settings.yaml"),
         top_k=_int_env("SECURITY_AGENT_TOP_K", 4),
         skills_enabled=_bool_env("SECURITY_AGENT_SKILLS_ENABLED", True),
+        vision_enabled=_bool_env("SECURITY_AGENT_VISION_ENABLED", False),
+        vision_model=os.getenv("SECURITY_AGENT_VISION_MODEL", "qwen-vl-plus"),
+        vision_api_key=os.getenv("SECURITY_AGENT_VISION_API_KEY") or os.getenv("OPENAI_API_KEY") or None,
+        vision_base_url=os.getenv("SECURITY_AGENT_VISION_BASE_URL") or os.getenv("OPENAI_BASE_URL") or None,
         sandbox_provider=os.getenv("SECURITY_AGENT_SANDBOX_PROVIDER", "local").strip().lower(),
         sandbox_allow_shell=_bool_env("SECURITY_AGENT_ALLOW_SHELL", False),
         opensandbox_domain=os.getenv("SECURITY_AGENT_OPENSANDBOX_DOMAIN") or None,

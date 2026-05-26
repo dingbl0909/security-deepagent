@@ -25,6 +25,32 @@ uvicorn security_agent.app:app --host 0.0.0.0 --port 8015
 
 如果没有可用的大模型服务，可以在 `.env` 中保持 `SECURITY_AGENT_LLM_ENABLED=false`，系统会使用本地规则链路完成测试。
 
+## 安防物品研判（图片识别）
+
+启用多模态能力后，主 Agent 会先识别图片/物品研判意图，再委派 `object-analyst` 子 Agent 调用多模态 API：
+
+```bash
+SECURITY_AGENT_VISION_ENABLED=true
+SECURITY_AGENT_VISION_MODEL=qwen-vl-plus
+SECURITY_AGENT_VISION_API_KEY=your-api-key
+SECURITY_AGENT_VISION_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+```
+
+调用示例：
+
+```bash
+curl -X POST http://127.0.0.1:8015/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "请识别这张抓拍图里的异常物品，并给出安防研判。",
+    "thread_id": "vision-test-1",
+    "user_id": "ops_001",
+    "image_path": "uploads/sample.jpg"
+  }'
+```
+
+图片文件需放在 `data/workspace/` 下，例如 `data/workspace/uploads/sample.jpg`。
+
 ## 前端工作台
 
 项目包含一个 React + TypeScript + Vite 前端，用于产品化展示安防助手能力：
@@ -41,6 +67,7 @@ npm run dev
 前端包含：
 
 - 智能工作台：聊天、答案、证据、ReAct 轨迹、任务和风险展示。
+- 图片上传：支持上传图片并调用后端 `image_base64` 完成安防物品研判。
 - 业务概览：设备和告警概览。
 - 历史会话：读取 `/threads` 和 `/threads/{thread_id}`。
 - 人工确认：读取 `/reviews` 并调用 `/review/continue`。

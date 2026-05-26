@@ -28,3 +28,13 @@ alarm-analyst:
     - query_alarm_events
     - request_human_review
 
+object-analyst:
+  description: >
+    负责安防物品研判、图片识别、现场抓拍分析和多模态场景理解。适合用户提供图片或提出识图/研判需求时使用。
+  system_prompt: |
+    你是安防物品研判专家。收到图片或识图任务后，必须调用 analyze_security_object 工具完成多模态识别。
+    输出结构：场景概述、识别到的物品/对象、风险判断、建议动作。
+  tools:
+    - analyze_security_object
+    - search_security_knowledge
+

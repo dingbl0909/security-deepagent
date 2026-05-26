@@ -29,7 +29,12 @@ app.add_middleware(
 
 @app.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    return HealthResponse(status="ok", app=settings.app_name, llm_enabled=settings.llm_enabled)
+    return HealthResponse(
+        status="ok",
+        app=settings.app_name,
+        llm_enabled=settings.llm_enabled,
+        vision_enabled=settings.vision_enabled,
+    )
 
 
 @app.post("/chat", response_model=ChatResponse)
@@ -38,6 +43,9 @@ def chat(request: ChatRequest) -> ChatResponse:
         message=request.message,
         thread_id=request.thread_id,
         user_id=request.user_id,
+        image_path=request.image_path,
+        image_url=request.image_url,
+        image_base64=request.image_base64,
     )
 
 

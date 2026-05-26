@@ -1,15 +1,23 @@
 import type { ChatResponse, HealthResponse } from "../types";
 
-export type PipelineMode = "local" | "deep-agent" | "deep-agent-ready" | "unknown";
+export type PipelineMode = "local" | "deep-agent" | "deep-agent-ready" | "vision" | "unknown";
 
 export type PipelineDisplay = {
   label: string;
   mode: PipelineMode;
 };
 
-export function resolvePipelineFromHealth(health: HealthResponse | undefined): PipelineDisplay {
+const OBJECT_ANALYSIS_INTENT = "安防物品研判 / 图片识别";
+
+export function resolvePipelineFromHealth(
+  health: HealthResponse | undefined,
+  hasImage = false,
+): PipelineDisplay {
   if (!health) {
     return { label: "链路检测中...", mode: "unknown" };
+  }
+  if (hasImage || health.vision_enabled) {
+    return { label: health.vision_enabled ? "物品研判就绪" : "物品研判待启用", mode: "vision" };
   }
   if (health.llm_enabled) {
     return { label: "DeepAgent 就绪", mode: "deep-agent-ready" };
@@ -18,6 +26,12 @@ export function resolvePipelineFromHealth(health: HealthResponse | undefined): P
 }
 
 export function resolvePipelineFromResponse(response: ChatResponse): PipelineDisplay {
+  if (response.intent === OBJECT_ANALYSIS_INTENT) {
+    return { label: OBJECT_ANALYSIS_INTENT, mode: "vision" };
+  }
+  if (response.react_trace.some((step) => step.includes("object-analyst"))) {
+    return { label: OBJECT_ANALYSIS_INTENT, mode: "vision" };
+  }
   const usesDeepAgent = response.react_trace.some((step) => step.includes("DeepAgent"));
   if (usesDeepAgent) {
     return { label: "DeepAgent + 大模型编排链路", mode: "deep-agent" };
@@ -31,9 +45,10 @@ export function resolvePipelineFromResponse(response: ChatResponse): PipelineDis
 export function resolveCurrentPipeline(
   health: HealthResponse | undefined,
   latestResponse: ChatResponse | undefined,
+  hasImage = false,
 ): PipelineDisplay {
   if (latestResponse) {
     return resolvePipelineFromResponse(latestResponse);
   }
-  return resolvePipelineFromHealth(health);
+  return resolvePipelineFromHealth(health, hasImage);
 }

@@ -10,6 +10,7 @@ from security_agent.database import Database, init_database
 from security_agent.knowledge import KnowledgeBase
 from security_agent.llm import build_llm
 from security_agent.memory import MemoryStore
+from security_agent.object_analyst import run_object_analyst
 from security_agent.prompts import MAIN_SYSTEM_PROMPT
 from security_agent.schemas import ChatResponse, Evidence
 from security_agent.skills import load_skills, render_skills_prompt
@@ -19,6 +20,22 @@ from security_agent.tools import SECURITY_TOOLS
 
 
 RISK_KEYWORDS = ["重启", "删除", "修改配置", "升级", "执行命令", "停用", "清空", "下发规则"]
+VISION_INTENT_KEYWORDS = [
+    "图片",
+    "图像",
+    "照片",
+    "抓拍",
+    "识别",
+    "研判",
+    "物品",
+    "识图",
+    "多模态",
+    "image",
+    "photo",
+    "snapshot",
+    "vision",
+]
+OBJECT_ANALYSIS_INTENT = "安防物品研判 / 图片识别"
 
 
 class SecurityAgentService:
@@ -34,10 +51,41 @@ class SecurityAgentService:
         self.skills = load_skills(self.settings.skills_dir) if self.settings.skills_enabled else []
         self.deep_agent = self._try_build_deep_agent()
 
-    def chat(self, message: str, thread_id: str, user_id: str) -> ChatResponse:
+    def chat(
+        self,
+        message: str,
+        thread_id: str,
+        user_id: str,
+        image_path: str | None = None,
+        image_url: str | None = None,
+        image_base64: str | None = None,
+    ) -> ChatResponse:
         self.database.upsert_thread(thread_id, user_id, title=message[:40])
         self.database.add_message(thread_id, "user", message)
-        self.audit.record(thread_id, "user_message", {"user_id": user_id, "message": message})
+        self.audit.record(
+            thread_id,
+            "user_message",
+            {
+                "user_id": user_id,
+                "message": message,
+                "has_image": self._has_vision_input(image_path, image_url, image_base64),
+            },
+        )
+
+        if self._should_route_vision(message, image_path, image_url, image_base64):
+            if not self._has_vision_input(image_path, image_url, image_base64):
+                response = self._chat_with_missing_image(message, thread_id, user_id)
+            else:
+                response = self._chat_with_object_analyst(
+                    message=message,
+                    thread_id=thread_id,
+                    user_id=user_id,
+                    image_path=image_path,
+                    image_url=image_url,
+                    image_base64=image_base64,
+                )
+            self._persist_response(response)
+            return response
 
         if self.deep_agent is not None:
             try:
@@ -104,14 +152,14 @@ class SecurityAgentService:
         )
         answer = self._extract_answer(result)
         evidence_hits = self.knowledge.search(message, self.settings.top_k)
-        risk_level = self._risk_level(message, answer)
+        risk_level = self._risk_level(message)
         review_id = None
         review_reason = None
         proposed_action = None
         risk_keywords: list[str] = []
         needs_review = risk_level in {"high", "critical"}
         if needs_review:
-            review_reason, proposed_action, risk_keywords = self._build_review_context(message, answer)
+            review_reason, proposed_action, risk_keywords = self._build_review_context(message)
             review_id = self.database.add_review_request(
                 thread_id=thread_id,
                 risk_level=risk_level,
@@ -131,6 +179,118 @@ class SecurityAgentService:
             review_reason=review_reason,
             proposed_action=proposed_action,
             risk_keywords=risk_keywords,
+        )
+
+    def _chat_with_missing_image(self, message: str, thread_id: str, user_id: str) -> ChatResponse:
+        answer = (
+            f"识别到这是{OBJECT_ANALYSIS_INTENT}请求，但当前未收到图片。\n\n"
+            "请通过以下任一方式提供图片后再试：\n"
+            "1. `image_path`：指向 `data/workspace/` 内的相对路径，例如 `uploads/sample.jpg`\n"
+            "2. `image_url`：可访问的图片 URL\n"
+            "3. `image_base64`：base64 编码图片内容"
+        )
+        return ChatResponse(
+            answer=answer,
+            thread_id=thread_id,
+            user_id=user_id,
+            react_trace=[
+                f"识别：这是{OBJECT_ANALYSIS_INTENT}问题。",
+                "判断：用户尚未提供 image_path、image_url 或 image_base64。",
+            ],
+            evidence=[],
+            tasks=[],
+            needs_review=False,
+            review_id=None,
+            risk_level="low",
+            intent=OBJECT_ANALYSIS_INTENT,
+        )
+
+    def _chat_with_object_analyst(
+        self,
+        message: str,
+        thread_id: str,
+        user_id: str,
+        image_path: str | None,
+        image_url: str | None,
+        image_base64: str | None,
+    ) -> ChatResponse:
+        if not self.settings.vision_enabled:
+            return ChatResponse(
+                answer=(
+                    f"识别到这是{OBJECT_ANALYSIS_INTENT}请求，但多模态能力未启用。\n\n"
+                    "请在 `.env` 中设置 `SECURITY_AGENT_VISION_ENABLED=true`，"
+                    "并配置 `SECURITY_AGENT_VISION_MODEL`、`SECURITY_AGENT_VISION_API_KEY`。"
+                ),
+                thread_id=thread_id,
+                user_id=user_id,
+                react_trace=[
+                    f"识别：这是{OBJECT_ANALYSIS_INTENT}问题。",
+                    "判断：vision 功能未启用，object-analyst 未调用多模态 API。",
+                ],
+                evidence=[],
+                tasks=[],
+                needs_review=False,
+                review_id=None,
+                risk_level="low",
+                intent=OBJECT_ANALYSIS_INTENT,
+            )
+
+        try:
+            result = run_object_analyst(
+                message,
+                image_path=image_path,
+                image_url=image_url,
+                image_base64=image_base64,
+            )
+        except Exception as exc:
+            self.audit.record(thread_id, "object_analyst_error", {"error": str(exc)})
+            return ChatResponse(
+                answer=f"已完成意图识别并委派 object-analyst，但多模态识别失败：{exc}",
+                thread_id=thread_id,
+                user_id=user_id,
+                react_trace=[
+                    f"识别：这是{OBJECT_ANALYSIS_INTENT}问题。",
+                    "行动：主 Agent 委派 object-analyst 子 Agent。",
+                    f"观察：analyze_security_object 调用失败，错误 {exc}。",
+                ],
+                evidence=[],
+                tasks=[],
+                needs_review=False,
+                review_id=None,
+                risk_level="low",
+                intent=OBJECT_ANALYSIS_INTENT,
+            )
+
+        hits = self.knowledge.search(message, self.settings.top_k)
+        react_trace = [
+            f"识别：这是{OBJECT_ANALYSIS_INTENT}问题。",
+            "行动：主 Agent 识别意图后委派 object-analyst 子 Agent。",
+            f"行动：object-analyst 调用 analyze_security_object；观察：模型 {result.model}，图片来源 {result.source}。",
+        ]
+        if hits:
+            react_trace.append(f"行动：补充检索本地知识库；观察：命中 {len(hits)} 条证据。")
+
+        answer_lines = [
+            "已完成安防物品研判。",
+            "",
+            result.answer,
+        ]
+        if hits:
+            answer_lines.extend(["", "相关知识库参考："])
+            for hit in hits[:2]:
+                answer_lines.append(f"- {hit.title}（{hit.source}）：{hit.snippet}")
+
+        return ChatResponse(
+            answer="\n".join(answer_lines),
+            thread_id=thread_id,
+            user_id=user_id,
+            react_trace=react_trace,
+            evidence=[Evidence(**hit.__dict__) for hit in hits],
+            tasks=[],
+            needs_review=False,
+            review_id=None,
+            risk_level=self._risk_level(message),
+            intent=OBJECT_ANALYSIS_INTENT,
         )
 
     def _chat_with_local_rules(self, message: str, thread_id: str, user_id: str) -> ChatResponse:
@@ -258,13 +418,33 @@ class SecurityAgentService:
         return [keyword for keyword in RISK_KEYWORDS if keyword in merged]
 
     @staticmethod
+    def _has_vision_input(
+        image_path: str | None,
+        image_url: str | None,
+        image_base64: str | None,
+    ) -> bool:
+        return bool(image_path or image_url or image_base64)
+
+    @staticmethod
+    def _should_route_vision(
+        message: str,
+        image_path: str | None,
+        image_url: str | None,
+        image_base64: str | None,
+    ) -> bool:
+        if SecurityAgentService._has_vision_input(image_path, image_url, image_base64):
+            return True
+        lowered = message.lower()
+        return any(keyword in message or keyword in lowered for keyword in VISION_INTENT_KEYWORDS)
+
+    @staticmethod
     def _build_review_context(message: str, answer: str = "") -> tuple[str, str, list[str]]:
-        risk_keywords = SecurityAgentService._matched_risk_keywords(message, answer)
+        risk_keywords = SecurityAgentService._matched_risk_keywords(message)
         proposed_action = message.strip() or "未提供明确动作描述。"
         if risk_keywords:
             reason = f"命中高风险关键词：{'、'.join(risk_keywords)}。"
         elif answer.strip():
-            reason = "模型回复或用户请求涉及高风险运维动作。"
+            reason = "用户请求涉及高风险运维动作。"
         else:
             reason = "请求中包含可能影响业务连续性的高风险动作。"
         return reason, proposed_action, risk_keywords
@@ -278,6 +458,9 @@ class SecurityAgentService:
 
     @staticmethod
     def _infer_intent(message: str, devices: list[dict[str, Any]], alarms: list[dict[str, Any]], hits) -> str:
+        lowered = message.lower()
+        if SecurityAgentService._should_route_vision(message, None, None, None):
+            return OBJECT_ANALYSIS_INTENT
         if any(keyword in message for keyword in ["部署", "接口", "启动", "服务", "配置", ".env"]):
             return "私有化部署 / 服务异常排查"
         if devices or any(keyword in message for keyword in ["摄像头", "设备", "离线", "接入", "心跳", "RTSP", "GB28181"]):

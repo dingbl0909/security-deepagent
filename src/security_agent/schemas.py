@@ -9,6 +9,9 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     thread_id: str = Field(default="default-thread")
     user_id: str = Field(default="ops_001")
+    image_path: str | None = None
+    image_url: str | None = None
+    image_base64: str | None = None
 
 
 class Evidence(BaseModel):
@@ -31,6 +34,7 @@ class ChatResponse(BaseModel):
     review_reason: str | None = None
     proposed_action: str | None = None
     risk_keywords: list[str] = Field(default_factory=list)
+    intent: str | None = None
 
 
 class ContinueReviewRequest(BaseModel):
@@ -48,4 +52,5 @@ class HealthResponse(BaseModel):
     status: str
     app: str
     llm_enabled: bool
+    vision_enabled: bool = False
 

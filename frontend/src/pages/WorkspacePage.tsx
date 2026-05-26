@@ -6,10 +6,15 @@ import { ReviewBanner } from "../components/ReviewBanner";
 import { TaskList } from "../components/TaskList";
 import { TraceTimeline } from "../components/TraceTimeline";
 import type { ChatResponse, HealthResponse } from "../types";
+import { readImageFile, type SelectedImage } from "../utils/image";
 import { resolveCurrentPipeline } from "../utils/pipeline";
+
+const DEFAULT_VISION_MESSAGE = "请识别这张图片中的安防相关物品，并给出研判结论。";
 
 export function WorkspacePage() {
   const [message, setMessage] = useState("");
+  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
+  const [imageError, setImageError] = useState<string>();
   const [responses, setResponses] = useState<ChatResponse[]>([]);
   const [health, setHealth] = useState<HealthResponse>();
   const [loading, setLoading] = useState(false);
@@ -18,7 +23,7 @@ export function WorkspacePage() {
   const [error, setError] = useState<string>();
   const threadId = useMemo(() => `web-${new Date().toISOString().slice(0, 10)}`, []);
   const latest = responses.length > 0 ? responses[responses.length - 1] : undefined;
-  const pipeline = resolveCurrentPipeline(health, latest);
+  const pipeline = resolveCurrentPipeline(health, latest, Boolean(selectedImage));
 
   useEffect(() => {
     void getHealth()
@@ -28,8 +33,18 @@ export function WorkspacePage() {
       });
   }, []);
 
+  async function handleImageSelect(file: File) {
+    setImageError(undefined);
+    try {
+      setSelectedImage(await readImageFile(file));
+    } catch (caught) {
+      setImageError(caught instanceof Error ? caught.message : "图片读取失败");
+    }
+  }
+
   async function handleSubmit() {
-    if (!message.trim()) {
+    const finalMessage = message.trim() || (selectedImage ? DEFAULT_VISION_MESSAGE : "");
+    if (!finalMessage) {
       return;
     }
     setLoading(true);
@@ -37,12 +52,15 @@ export function WorkspacePage() {
     setReviewStatus(undefined);
     try {
       const response = await sendChat({
-        message,
+        message: finalMessage,
         thread_id: threadId,
         user_id: "ops_001",
+        image_base64: selectedImage?.base64 ?? null,
       });
       setResponses((current) => [...current, response]);
       setMessage("");
+      setSelectedImage(null);
+      setImageError(undefined);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "请求失败");
     } finally {
@@ -71,10 +89,18 @@ export function WorkspacePage() {
       <ChatPanel
         message={message}
         setMessage={setMessage}
+        selectedImage={selectedImage}
+        imageError={imageError}
+        visionEnabled={health?.vision_enabled}
+        onImageSelect={(file) => void handleImageSelect(file)}
+        onImageClear={() => {
+          setSelectedImage(null);
+          setImageError(undefined);
+        }}
         responses={responses}
         loading={loading}
         pipeline={pipeline}
-        onSubmit={handleSubmit}
+        onSubmit={() => void handleSubmit()}
       />
 
       <aside className="insight-column">

@@ -6,6 +6,7 @@ from typing import Any, Callable
 from security_agent.database import Database
 from security_agent.knowledge import KnowledgeBase
 from security_agent.tasks import TaskService
+from security_agent.vision import analyze_security_image
 
 try:
     from langchain_core.tools import tool
@@ -70,6 +71,37 @@ def create_security_todos(task: str, thread_id: str = "default-thread") -> str:
     return _json(todos)
 
 
+@tool("analyze_security_object", parse_docstring=True)
+def analyze_security_object(
+    question: str,
+    image_path: str = "",
+    image_url: str = "",
+    image_base64: str = "",
+) -> str:
+    """
+    调用多模态模型完成安防物品研判和图片识别。
+
+    Args:
+        question: 用户问题或研判要求。
+        image_path: 工作目录内图片相对路径，例如 uploads/sample.jpg。
+        image_url: 图片 URL 或 data URL。
+        image_base64: base64 编码图片内容。
+    """
+    result = analyze_security_image(
+        question,
+        image_path=image_path or None,
+        image_url=image_url or None,
+        image_base64=image_base64 or None,
+    )
+    return _json(
+        {
+            "answer": result.answer,
+            "model": result.model,
+            "source": result.source,
+        }
+    )
+
+
 @tool("request_human_review", parse_docstring=True)
 def request_human_review(
     reason: str,
@@ -108,6 +140,7 @@ SECURITY_TOOLS = [
     query_device_status,
     query_alarm_events,
     create_security_todos,
+    analyze_security_object,
     request_human_review,
 ]
 
