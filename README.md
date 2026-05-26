@@ -1,4 +1,4 @@
-# Security DeepAgent Practice
+# Security DeepAgent
 
 面向安防场景的轻量化 DeepAgents 本地生产系统。项目基于 FastAPI、SQLite、Markdown 知识库和 React 前端，支持从问答、知识检索、设备告警查询、人工确认到图片物品研判的完整闭环，适合在个人工作站上部署、演示和二次开发。
 
