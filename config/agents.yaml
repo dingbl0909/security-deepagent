@@ -1,0 +1,69 @@
+model_profiles:
+  private-main:
+    provider: openai-compatible
+    base_url: http://llm-gateway.internal/v1
+    model: qwen-agent-main
+    api_key_env: PRIVATE_LLM_API_KEY
+    timeout_seconds: 60
+    data_policy: internal_only
+
+  private-long-context:
+    provider: openai-compatible
+    base_url: http://llm-gateway.internal/v1
+    model: qwen-long-context
+    api_key_env: PRIVATE_LLM_API_KEY
+    timeout_seconds: 90
+    data_policy: internal_only
+
+  public-vision:
+    provider: openai-compatible
+    base_url: https://api.public-provider.example/v1
+    model: public-vision-model
+    api_key_env: PUBLIC_VISION_API_KEY
+    timeout_seconds: 90
+    data_policy: image_review_required
+
+agents:
+  - name: main-agent
+    description: 主 Agent，负责任务理解、规划和委派
+    model_profile: private-main
+    tools:
+      - search_security_knowledge
+      - request_human_review
+
+  - name: security-researcher
+    description: 安防知识检索与 SOP 问答
+    model_profile: private-long-context
+    tools:
+      - search_security_knowledge
+      - request_human_review
+
+  - name: ops-troubleshooter
+    description: 设备接入、离线、部署排障
+    model_profile: private-main
+    tools:
+      - query_device_status
+      - search_security_knowledge
+      - create_security_todos
+      - update_task_status
+      - request_human_review
+      - archive_episode
+
+  - name: alarm-analyst
+    description: 告警误报、规则分析、处置建议
+    model_profile: private-main
+    tools:
+      - query_alarm_events
+      - search_security_knowledge
+      - create_security_todos
+      - update_task_status
+      - request_human_review
+      - archive_episode
+
+  - name: object-analyst
+    description: 图片物品研判
+    model_profile: public-vision
+    tools:
+      - analyze_security_object
+      - search_security_knowledge
+      - request_human_review

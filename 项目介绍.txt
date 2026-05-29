@@ -1,0 +1,34 @@
+项目背景：
+随着 Agent 技术在企业场景加速落地，公共 Skills 市场在供应链安全、执行边界和宿主机访问控制方面存在较高风险，难以直接引入第三方技能全集。项目面向安防运维场景，基于 DeepAgents 构建可私有化部署的 Agent 应用平台，覆盖设备接入排障、布控告警分析、知识库问答、现场图片物品研判等高频需求。平台通过 Harness 驾驭层统一上下文治理、工具编排与任务恢复，并结合 Skills 声明式管理、Sub-agents 场景拆分、沙箱隔离和人工确认机制，在保障数据与系统安全的前提下，提升安防事件处置效率与过程可追溯性。
+
+技术架构：
+
+项目基于 DeepAgents（LangChain + LangGraph） 构建 Agent 运行时，后端采用 FastAPI 提供 Agent 服务，前端采用 React + TypeScript + Vite 构建安防智能工作台，形成“前端交互层 - API 服务层 - Agent 驾驭层 - 工具/Skills/沙箱层”的分层架构：
+
+前端交互层：提供智能对话、证据展示、ReAct 轨迹、任务清单、人工确认、设备/告警概览、图片上传研判等能力，并根据 /health 动态展示当前 Agent 执行链路。
+API 服务层：基于 FastAPI 提供 /chat、/threads、/reviews、/devices、/alarms 等接口，支持会话持久化、审核流转和业务数据查询。
+Agent 驾驭层：主 Agent 负责意图识别与任务编排，按场景委派 security-researcher、ops-troubleshooter、alarm-analyst、object-analyst 等 Sub-agents。
+Skills 与沙箱层：Skills 以 Markdown + YAML 管理并按需注入系统提示词；Agent 文件访问限制在 data/workspace/，默认采用本地轻量沙箱，预留 OpenSandbox 接入能力；工具调用采用白名单机制，高风险动作会触发中断、终端提示和人工确认，审批后从检查点恢复并继续原流程。
+
+项目实现：
+
+Harness 驾驭层与运行底座建设
+基于 Harness Engineering 将上下文治理、工具编排、会话持久化、审计日志、检查点恢复从业务逻辑中剥离，构建可审计、可恢复、可扩展的 Agent 运行底座，适配设备排障、告警分析、图片研判等安防任务。
+
+Skills + Sub-agents 场景化编排
+建立 Skills 声明式管理机制，运行时加载 skills/*/SKILL.md 并注入 Agent 提示词；通过 YAML 配置研究、排障、告警、物品研判等 Sub-agents，实现主 Agent 意图识别后的任务委派与工具白名单控制。
+
+安防场景研判（多模态）能力
+针对现场抓拍与图片识物场景，设计“主 Agent 意图识别 → object-analyst 子 Agent → 多模态 API”链路，支持 image_path / image_url / image_base64 三种图片输入方式，输出场景概述、识别对象、风险判断和处置建议。
+
+Human-in-the-loop 风险控制
+对重启、删改配置、升级等高风险动作建立关键词识别、工具级风险标记与人工确认机制；Agent 在命中高风险动作时暂停当前执行链路，写入 checkpoint 和 review request，同时在终端输出待确认信息，提示 review_id、风险原因、建议动作和恢复入口。前端 Risk Control 模块展示待确认动作、触发原因和命中关键词；审批通过后通过 LangGraph interrupt / resume 从 checkpoint 继续执行原流程，审批拒绝后恢复流程并给出终止说明或替代建议，兼顾自动化效率与运维合规。
+
+前端安防智能工作台建设
+基于 React 实现产品化前端，包括：
+
+智能工作台：聊天问答、知识库证据、ReAct 轨迹、排查任务、风险状态展示
+业务概览：设备状态、告警事件可视化
+历史会话：线程列表与消息追溯
+人工确认：待审核列表与批准/拒绝操作
+前端通过 API Client 与 FastAPI 后端联调，形成完整“问答 - 研判 - 审核 - 追溯”闭环

@@ -1,0 +1,2 @@
+"""Milvus collection initialization helpers."""
+

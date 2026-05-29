@@ -1,8 +1,6 @@
 .env
+.venv/
 __pycache__/
 *.pyc
-.venv/
-data/db/*.sqlite3
-data/logs/
-data/memory/
-data/workspace/
+.pytest_cache/
+*.egg-info/
